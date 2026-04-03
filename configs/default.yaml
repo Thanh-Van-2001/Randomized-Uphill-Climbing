@@ -1,0 +1,104 @@
+# RUC-TS: Default Configuration
+# All values aligned with paper Sections 3-4.
+
+# ---------------------------------------------------------------------------
+# Operator Grammar (Section 3.2)
+# ---------------------------------------------------------------------------
+grammar:
+  max_depth: 4                         # bounded-depth expressions (d <= 4)
+  operator_families:
+    arithmetic: 12                     # add, mul, div, log, abs, sign, power, clip
+    statistical: 28                    # zscore, skew, kurtosis, information_ratio
+    cross_sectional: 15                # rank, percentile, demean, zscore_cs
+    rolling_window: 315                # ts_mean, ts_std, ts_rank, ts_delta, etc.
+  total_operators: 370
+  window_sizes: [5, 10, 21, 63, 126, 252]
+
+# ---------------------------------------------------------------------------
+# RUC Search (Algorithm 1, Section 3.3)
+# ---------------------------------------------------------------------------
+search:
+  pool_size: 500                       # K = 500 candidate programs
+  elite_count: 50                      # N = 50 top programs
+  iterations: 200                      # I = 200 search iterations
+  initial_temperature: 1.0             # tau_0 = 1.0
+  annealing: "linear"                  # tau_t = tau_0 * (1 - t/I)
+  diversity_injection_rate: 0.10       # replace 10% worst each iteration
+  perturbation_ops:
+    - swap_operator                    # type-compatible operator swap
+    - resize_window                    # rolling window parameter change
+    - swap_variable                    # leaf variable swap
+    - graft_subtree                    # fresh subtree onto random node
+  final_features: 30                   # K=30 symbolic expressions output
+
+# ---------------------------------------------------------------------------
+# Dual Surrogate Scoring (Section 3.4)
+# ---------------------------------------------------------------------------
+scoring:
+  alpha: 0.6                           # s = alpha * s_OLS + (1-alpha) * s_MLP
+  ols:
+    bic_penalty_lambda: 0.01           # lambda in Eq. 1
+  mlp:
+    hidden_dims: [64, 32]              # 2-layer MLP
+    activation: "relu"
+    epochs: 50                         # trained for 50 epochs per window
+    learning_rate: 0.001
+  top_m_for_stage2: 100                # only top-M candidates advance to MLP
+
+# ---------------------------------------------------------------------------
+# Overfitting Safeguards (Section 3.5)
+# ---------------------------------------------------------------------------
+filtering:
+  nested_cv:
+    train_ratio: 0.60
+    val_ratio: 0.20
+    test_ratio: 0.20
+  vif_threshold: 5.0                   # VIF < 5 to control multicollinearity
+  stability_threshold_sigma: 2.0       # R2 variance < 2*sigma across windows
+
+# ---------------------------------------------------------------------------
+# Datasets (Table 1)
+# ---------------------------------------------------------------------------
+datasets:
+  sp500:
+    T: 5034
+    D: 25
+    frequency: "daily"
+    target: "21-day realized volatility"
+    period: "2010-2024"
+  uci_appliances:
+    T: 19735
+    D: 28
+    frequency: "10min"
+    target: "Energy (Wh)"
+  jena_climate:
+    T: 420551
+    D: 14
+    frequency: "10min"
+    target: "Temperature (+6h)"
+
+# ---------------------------------------------------------------------------
+# Downstream Models (Section 4.2)
+# ---------------------------------------------------------------------------
+downstream:
+  xgboost:
+    n_estimators: 500
+    max_depth: 6
+    learning_rate: 0.05
+  lstm:
+    n_layers: 2
+    hidden_size: 128
+    dropout: 0.2
+    epochs: 100
+  tft:
+    n_heads: 4
+    hidden_size: 64
+    epochs: 50
+
+# ---------------------------------------------------------------------------
+# Experiment (Section 4.3)
+# ---------------------------------------------------------------------------
+experiment:
+  n_seeds: 5                           # 5 random seeds
+  significance_test: "diebold_mariano" # DM test, p < 0.05
+  output_dir: "outputs"
